@@ -28,6 +28,7 @@ npm test
 
 ```
 ├── app.js                 # Browser entry point that wires up the alert form and log
+├── src/config.js          # Centralized defaults for polling and mock data paths
 ├── assets/                # Deterministic mock price histories used by the UI
 │   └── mock-prices.json
 ├── scripts/serve.js       # Minimal static file server for local development
@@ -43,3 +44,6 @@ npm test
 The bundled price sequences loop when exhausted so alerts continue firing during long sessions.
 Feel free to extend `assets/mock-prices.json` with additional tickers or alternative price
 trajectories to test bearish and bullish scenarios alike.
+
+You can tweak default polling behavior via `src/config.js` to change the initial interval,
+maximum checks, or move the mock data file without touching the UI code.

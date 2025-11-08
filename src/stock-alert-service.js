@@ -1,5 +1,4 @@
-const DEFAULT_INTERVAL_MS = 5000;
-const DEFAULT_MAX_CHECKS = 10;
+import { DEFAULT_INTERVAL_MS, DEFAULT_MAX_CHECKS } from './config.js';
 
 /**
  * Create a reusable price source that cycles through the provided price history.
@@ -48,6 +47,10 @@ export function formatAlertMessage(details) {
 }
 
 function wait(ms, signal, onEvent) {
+  if (signal?.aborted) {
+    return Promise.resolve();
+  }
+
   if (ms <= 0) {
     return Promise.resolve();
   }

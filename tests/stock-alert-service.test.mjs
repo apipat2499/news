@@ -6,6 +6,7 @@ import {
   monitorPrices,
   priceMeetsThreshold,
 } from '../src/stock-alert-service.js';
+import { DEFAULT_INTERVAL_MS, DEFAULT_MAX_CHECKS } from '../src/config.js';
 
 describe('priceMeetsThreshold', () => {
   it('returns true when price crosses above the target', () => {
@@ -104,5 +105,42 @@ describe('monitorPrices', () => {
     const result = await monitorPromise;
     assert.equal(result.status, 'aborted');
     assert.ok(events.some((event) => event.type === 'aborted'));
+  });
+
+  it('uses config defaults when interval and maxChecks are omitted', async () => {
+    const getNextPrice = createMockPriceSource({ AAPL: [150, 151, 152, 153, 154, 155] });
+    const controller = new AbortController();
+    const events = [];
+
+    const result = await monitorPrices({
+      config: { symbol: 'AAPL', direction: 'above', targetPrice: 999 },
+      getNextPrice,
+      signal: controller.signal,
+      onEvent: (event) => {
+        events.push(event);
+        if (event.type === 'waiting') {
+          controller.abort();
+        }
+      },
+    });
+
+    assert.equal(result.status, 'aborted');
+    const waitingEvent = events.find((event) => event.type === 'waiting');
+    assert.ok(waitingEvent);
+    assert.equal(waitingEvent.intervalMs, DEFAULT_INTERVAL_MS);
+    const checkEvents = events.filter((event) => event.type === 'check');
+    assert.equal(checkEvents.length, 1);
+  });
+
+  it('honors the default maxChecks when not provided', async () => {
+    const getNextPrice = createMockPriceSource({ AAPL: [1, 1, 1, 1, 1, 1] });
+    const result = await monitorPrices({
+      config: { symbol: 'AAPL', direction: 'above', targetPrice: 999 },
+      getNextPrice,
+      intervalMs: 0,
+    });
+
+    assert.equal(result.status, 'timeout');
+    assert.equal(result.attempts, DEFAULT_MAX_CHECKS);
   });
 });

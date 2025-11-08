@@ -1,4 +1,11 @@
 import { createMockPriceSource, monitorPrices } from './src/stock-alert-service.js';
+import {
+  DEFAULT_INTERVAL_MS,
+  DEFAULT_MAX_CHECKS,
+  MIN_INTERVAL_MS,
+  MIN_MAX_CHECKS,
+  PRICE_DATA_PATH,
+} from './src/config.js';
 
 const form = document.querySelector('#alert-form');
 const logList = document.querySelector('#log');
@@ -37,8 +44,15 @@ function resetController() {
   stopButton.disabled = true;
 }
 
+function setDefaultConfigValues() {
+  form.intervalMs.value = String(DEFAULT_INTERVAL_MS);
+  form.intervalMs.min = String(MIN_INTERVAL_MS);
+  form.maxChecks.value = String(DEFAULT_MAX_CHECKS);
+  form.maxChecks.min = String(MIN_MAX_CHECKS);
+}
+
 async function loadPriceData() {
-  const response = await fetch('./assets/mock-prices.json');
+  const response = await fetch(PRICE_DATA_PATH);
   if (!response.ok) {
     throw new Error('Unable to load price data');
   }
@@ -164,6 +178,8 @@ stopButton.addEventListener('click', () => {
   setStatus('Cancelled', 'neutral');
   stopMonitoring();
 });
+
+setDefaultConfigValues();
 
 loadPriceData()
   .then(() => {
