@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Stock Alert Monitor</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Stock Alert Monitor</h1>
+        <p class="description">
+          Configure an alert and watch mock market data stream in real time. The monitor cycles through
+          sample price histories so you can rehearse alert scenarios without a brokerage account.
+        </p>
+      </header>
+
+      <section class="controls">
+        <span id="status" data-variant="idle">Loading…</span>
+        <button id="stop-monitoring" type="button" disabled>Stop</button>
+      </section>
+
+      <form id="alert-form">
+        <label>
+          Stock symbol
+          <select id="symbol" name="symbol" required>
+            <option value="" disabled selected>Select a ticker</option>
+          </select>
+        </label>
+
+        <label>
+          Direction
+          <select id="direction" name="direction">
+            <option value="above">At or above target</option>
+            <option value="below">At or below target</option>
+          </select>
+        </label>
+
+        <label>
+          Target price (USD)
+          <input id="targetPrice" name="targetPrice" type="number" min="0" step="0.01" required />
+        </label>
+
+        <label>
+          Check interval (ms)
+          <input id="intervalMs" name="intervalMs" type="number" min="100" step="100" />
+        </label>
+
+        <label>
+          Maximum checks
+          <input id="maxChecks" name="maxChecks" type="number" min="1" step="1" />
+        </label>
+
+        <button type="submit">Start monitoring</button>
+      </form>
+
+      <section class="monitoring-panel">
+        <div class="panel">
+          <h2>Latest price</h2>
+          <div class="price-readout"><span id="latest-price">—</span> USD</div>
+        </div>
+        <div class="panel">
+          <h2>Activity log</h2>
+          <ul id="log" class="log"></ul>
+        </div>
+      </section>
+    </main>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
