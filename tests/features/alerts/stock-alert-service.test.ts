@@ -32,6 +32,7 @@ describe('StockAlertService', () => {
 
     expect(notifications).toHaveLength(1);
     expect(notifications[0]).toContain('📈 Alert');
+    expect(notifications[0]).toContain('Range: 180.00-200.00');
   });
 
   it('notifies when price reaches a below target', async () => {
@@ -42,6 +43,7 @@ describe('StockAlertService', () => {
 
     expect(notifications).toHaveLength(1);
     expect(notifications[0]).toContain('target below');
+    expect(notifications[0]).toContain('Range: 190.00-210.00');
   });
 
   it('emits end-of-window message when target not met', async () => {
@@ -52,5 +54,6 @@ describe('StockAlertService', () => {
 
     expect(notifications).toHaveLength(1);
     expect(notifications[0]).toContain('Alert window ended');
+    expect(notifications[0]).toContain('Range observed: 180.00-182.00');
   });
 });
