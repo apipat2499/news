@@ -22,15 +22,30 @@ describe('priceMeetsThreshold', () => {
 
 describe('formatAlertMessage', () => {
   it('includes the symbol, direction and price', () => {
+    const message = formatAlertMessage(
+      {
+        symbol: 'aapl',
+        direction: 'above',
+        targetPrice: 190.12,
+        price: 191.42,
+      },
+      { lowestPrice: 185.12, highestPrice: 191.42 }
+    );
+    assert.match(message, /AAPL/);
+    assert.match(message, /191.42/);
+    assert.match(message, /190.12/);
+    assert.match(message, /Range: 185.12-191.42/);
+  });
+
+  it('omits range details when stats are unavailable', () => {
     const message = formatAlertMessage({
       symbol: 'aapl',
       direction: 'above',
       targetPrice: 190.12,
       price: 191.42,
     });
-    assert.match(message, /AAPL/);
-    assert.match(message, /191.42/);
-    assert.match(message, /190.12/);
+
+    assert.doesNotMatch(message, /Range:/);
   });
 });
 
@@ -65,19 +80,27 @@ describe('monitorPrices', () => {
     const trigger = events.find((event) => event.type === 'trigger');
     assert.ok(trigger);
     assert.equal(trigger.price, 192);
+    assert.deepEqual(result.stats, { highestPrice: 192, lowestPrice: 188 });
+    assert.deepEqual(trigger.stats, { highestPrice: 192, lowestPrice: 188 });
   });
 
   it('returns timeout when the price never triggers', async () => {
     const getNextPrice = createMockPriceSource({ AAPL: [150, 151, 152] });
+    const events = [];
     const result = await monitorPrices({
       config: { symbol: 'AAPL', direction: 'above', targetPrice: 200 },
       getNextPrice,
       intervalMs: 0,
       maxChecks: 3,
+      onEvent: (event) => events.push(event),
     });
 
     assert.equal(result.status, 'timeout');
     assert.equal(result.attempts, 3);
+    assert.deepEqual(result.stats, { highestPrice: 152, lowestPrice: 150 });
+    const timeoutEvent = events.find((event) => event.type === 'timeout');
+    assert.match(timeoutEvent.message, /Range observed: 150.00-152.00/);
+    assert.deepEqual(timeoutEvent.stats, { highestPrice: 152, lowestPrice: 150 });
   });
 
   it('stops when aborted between checks', async () => {
@@ -105,6 +128,9 @@ describe('monitorPrices', () => {
     const result = await monitorPromise;
     assert.equal(result.status, 'aborted');
     assert.ok(events.some((event) => event.type === 'aborted'));
+    assert.deepEqual(result.stats, { highestPrice: 150, lowestPrice: 150 });
+    const checkEvent = events.find((event) => event.type === 'check');
+    assert.deepEqual(checkEvent.stats, { highestPrice: 150, lowestPrice: 150 });
   });
 
   it('uses config defaults when interval and maxChecks are omitted', async () => {
@@ -130,6 +156,8 @@ describe('monitorPrices', () => {
     assert.equal(waitingEvent.intervalMs, DEFAULT_INTERVAL_MS);
     const checkEvents = events.filter((event) => event.type === 'check');
     assert.equal(checkEvents.length, 1);
+    assert.deepEqual(result.stats, { highestPrice: 150, lowestPrice: 150 });
+    assert.deepEqual(checkEvents[0].stats, { highestPrice: 150, lowestPrice: 150 });
   });
 
   it('honors the default maxChecks when not provided', async () => {
@@ -142,5 +170,6 @@ describe('monitorPrices', () => {
 
     assert.equal(result.status, 'timeout');
     assert.equal(result.attempts, DEFAULT_MAX_CHECKS);
+    assert.deepEqual(result.stats, { highestPrice: 1, lowestPrice: 1 });
   });
 });

@@ -41,12 +41,24 @@ export function priceMeetsThreshold(price, config) {
  * Format a human readable notification message.
  * @param {{ symbol: string, direction: 'above' | 'below', targetPrice: number, price: number }} details
  */
-export function formatAlertMessage(details) {
+export function formatAlertMessage(details, stats) {
   const directionText = details.direction === 'above' ? 'at or above' : 'at or below';
-  return `\uD83D\uDCC8 Alert: ${details.symbol.toUpperCase()} is ${details.price.toFixed(2)} (${directionText} ${details.targetPrice.toFixed(2)})`;
+  const baseMessage = `\uD83D\uDCC8 Alert: ${details.symbol.toUpperCase()} is ${details.price.toFixed(
+    2
+  )} (${directionText} ${details.targetPrice.toFixed(2)})`;
+
+  if (
+    typeof stats?.lowestPrice !== 'number' ||
+    typeof stats?.highestPrice !== 'number'
+  ) {
+    return baseMessage;
+  }
+
+  const rangeText = `${stats.lowestPrice.toFixed(2)}-${stats.highestPrice.toFixed(2)}`;
+  return `${baseMessage} | Range: ${rangeText}`;
 }
 
-function wait(ms, signal, onEvent) {
+function wait(ms, signal, onEvent, getStats) {
   if (signal?.aborted) {
     return Promise.resolve();
   }
@@ -68,7 +80,7 @@ function wait(ms, signal, onEvent) {
 
     const handleAbort = () => {
       cleanup();
-      onEvent?.({ type: 'aborted' });
+      onEvent?.({ type: 'aborted', stats: getStats?.() });
       resolve();
     };
 
@@ -117,37 +129,67 @@ export async function monitorPrices(options) {
   }
 
   const upperSymbol = config.symbol.toUpperCase();
+  let highestPrice;
+  let lowestPrice;
+
+  const updateStats = (price) => {
+    if (typeof price !== 'number' || Number.isNaN(price)) {
+      return;
+    }
+
+    highestPrice =
+      typeof highestPrice === 'number' ? Math.max(highestPrice, price) : price;
+    lowestPrice = typeof lowestPrice === 'number' ? Math.min(lowestPrice, price) : price;
+  };
+
+  const currentStats = () => {
+    if (typeof highestPrice !== 'number' || typeof lowestPrice !== 'number') {
+      return undefined;
+    }
+
+    return { highestPrice, lowestPrice };
+  };
 
   for (let attempt = 1; attempt <= maxChecks; attempt += 1) {
     if (signal?.aborted) {
-      onEvent?.({ type: 'aborted', attempt });
-      return { status: 'aborted', attempts: attempt - 1 };
+      onEvent?.({ type: 'aborted', attempt, stats: currentStats() });
+      return { status: 'aborted', attempts: attempt - 1, stats: currentStats() };
     }
 
     const price = await getNextPrice(upperSymbol);
+    updateStats(price);
     const meets = priceMeetsThreshold(price, config);
 
-    onEvent?.({ type: 'check', attempt, price, meets });
+    onEvent?.({ type: 'check', attempt, price, meets, stats: currentStats() });
 
     if (meets) {
-      const message = formatAlertMessage({
-        symbol: upperSymbol,
-        direction: config.direction,
-        targetPrice: config.targetPrice,
-        price,
-      });
+      const stats = currentStats();
+      const message = formatAlertMessage(
+        {
+          symbol: upperSymbol,
+          direction: config.direction,
+          targetPrice: config.targetPrice,
+          price,
+        },
+        stats
+      );
 
-      onEvent?.({ type: 'trigger', attempt, price, message });
-      return { status: 'triggered', attempts: attempt, price, message };
+      onEvent?.({ type: 'trigger', attempt, price, message, stats });
+      return { status: 'triggered', attempts: attempt, price, message, stats };
     }
 
     if (attempt < maxChecks) {
-      onEvent?.({ type: 'waiting', intervalMs });
-      await wait(intervalMs, signal, onEvent);
+      onEvent?.({ type: 'waiting', intervalMs, stats: currentStats() });
+      await wait(intervalMs, signal, onEvent, currentStats);
     }
   }
 
-  const timeoutMessage = `\u2139\uFE0F Alert window ended for ${upperSymbol} without triggering.`;
-  onEvent?.({ type: 'timeout', message: timeoutMessage });
-  return { status: 'timeout', attempts: maxChecks, message: timeoutMessage };
+  const stats = currentStats();
+  const rangeText =
+    stats?.lowestPrice !== undefined && stats?.highestPrice !== undefined
+      ? ` Range observed: ${stats.lowestPrice.toFixed(2)}-${stats.highestPrice.toFixed(2)}.`
+      : '';
+  const timeoutMessage = `\u2139\uFE0F Alert window ended for ${upperSymbol} without triggering.${rangeText}`;
+  onEvent?.({ type: 'timeout', message: timeoutMessage, stats });
+  return { status: 'timeout', attempts: maxChecks, message: timeoutMessage, stats };
 }
